@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, String
+from sqlalchemy import DateTime, Enum, Index, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.modules.auth.domain.role import Role
@@ -29,3 +29,5 @@ class UserRow(Base):
         nullable=False,
         default=lambda: datetime.now(UTC),
     )
+
+    __table_args__ = (Index("ix_users_email", "email"),)
