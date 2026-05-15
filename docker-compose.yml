@@ -1,0 +1,51 @@
+# Local development stack. Production uses orchestration (k8s / ECS / Fly / etc.)
+# not this file.
+#
+# - api      : FastAPI app, hot-reload bind-mounted source
+# - postgres : Postgres 16 (same major version as CI per NFR-T4)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flex
+      POSTGRES_PASSWORD: flex
+      POSTGRES_DB: flex
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flex -d flex"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flex-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Override DATABASE_URL host inside the network
+      DATABASE_URL: postgresql+asyncpg://flex:flex@postgres:5432/flex
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    # Bind-mount source for hot reload during local dev. Production image
+    # ships its own copy and ignores this mount.
+    volumes:
+      - ./src:/app/src
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  postgres_data:
+    name: flex_postgres_data

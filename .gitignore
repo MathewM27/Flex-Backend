@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+.uv/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# Type checkers
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# IDE / editors (kept: .vscode/settings.json is committed)
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Docker
+.docker/
+
+# Alembic local SQLite (if ever used for prototyping — never tests)
+*.sqlite
+*.sqlite3
+*.db
+
+# Build artifacts
+*.pid

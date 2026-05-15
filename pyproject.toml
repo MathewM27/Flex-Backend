@@ -1,0 +1,165 @@
+[project]
+name = "flex-backend"
+version = "0.1.0"
+description = "Flex — short-stay booking backend (FastAPI + Postgres, clean architecture)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary" }
+authors = [{ name = "Mathews Mwangi" }]
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.20",
+    "httpx>=0.28",
+    "twilio>=9.3",
+    "uuid-utils>=0.10",
+    "structlog>=24.4",
+    "email-validator>=2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "coverage>=7.6",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "types-passlib",
+    "pre-commit>=4.0",
+    "aiosqlite>=0.20",  # only for misc local prototyping, NEVER for tests
+]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# uv configuration
+# ──────────────────────────────────────────────────────────────────────────────
+[tool.uv]
+package = false  # this is an application, not a library
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ruff — linter + formatter (single tool, fast)
+# ──────────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",       # pycodestyle + pyflakes
+    "I",                  # isort
+    "B",                  # bugbear
+    "UP",                 # pyupgrade
+    "SIM",                # simplify
+    "RUF",                # ruff-specific
+    "ASYNC",              # async correctness
+    "S",                  # bandit security
+    "A",                  # builtin shadowing
+    "C4",                 # comprehensions
+    "PIE",                # misc
+    "PT",                 # pytest style
+    "RET",                # return statements
+    "TID",                # tidy imports
+]
+ignore = [
+    "S101",   # assert is fine in tests
+    "B008",   # FastAPI Depends() in defaults is idiomatic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PT011"]
+"alembic/env.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# mypy — strict on domain + application, relaxed elsewhere
+# ──────────────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+plugins = ["pydantic.mypy"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+check_untyped_defs = true
+
+# Strict mode for the layers that hold business rules
+[[tool.mypy.overrides]]
+module = [
+    "src.modules.*.domain.*",
+    "src.modules.*.application.*",
+    "src.shared.*",
+]
+strict = true
+
+# Third-party libs without stubs
+[[tool.mypy.overrides]]
+module = ["passlib.*", "jose.*", "twilio.*", "uuid_utils.*"]
+ignore_missing_imports = true
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Pytest
+# ──────────────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+]
+markers = [
+    "unit: pure unit tests (no I/O)",
+    "integration: tests that hit a real DB or external adapter",
+    "e2e: full HTTP surface tests through the FastAPI app",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:passlib.*",
+]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Coverage
+# ──────────────────────────────────────────────────────────────────────────────
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "src/main.py",
+    "alembic/*",
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+]
+fail_under = 80
+
+[tool.coverage.paths]
+source = ["src", "/app/src"]

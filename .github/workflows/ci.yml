@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  # Dummy values matching the format the app expects. Tests use these,
+  # never production secrets (NFR-CI2).
+  APP_ENV: local
+  DATABASE_URL: postgresql+asyncpg://flex:flex@localhost:5432/flex
+  JWT_SECRET: ci-secret-min-32-characters-long-xxxxxxxxxxxxxx
+  CORS_ORIGINS: http://localhost:3000
+  NOTIFICATION_PROVIDER: console
+  PAYMENT_PROVIDER: mock
+  PAYMENT_WEBHOOK_SECRET: ci-webhook-secret-xxxxxxxxxx
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install dev deps
+        run: uv sync --frozen --group dev || uv sync --group dev
+      - name: ruff check
+        run: uv run ruff check .
+      - name: ruff format --check
+        run: uv run ruff format --check .
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install deps
+        run: uv sync --frozen --group dev || uv sync --group dev
+      - name: mypy
+        run: uv run mypy src
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flex
+          POSTGRES_PASSWORD: flex
+          POSTGRES_DB: flex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex -d flex"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install deps
+        run: uv sync --frozen --group dev || uv sync --group dev
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+      - name: pytest
+        run: |
+          uv run pytest \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-fail-under=80
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  migrations-check:
+    name: migrations-check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flex
+          POSTGRES_PASSWORD: flex
+          POSTGRES_DB: flex
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex -d flex"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.10.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install deps
+        run: uv sync --frozen --group dev || uv sync --group dev
+      - name: Apply migrations from zero
+        run: uv run alembic upgrade head
+      - name: Verify no model/migration drift
+        run: uv run alembic check
+
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, typecheck, test, migrations-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: flex-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
