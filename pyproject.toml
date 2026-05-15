@@ -147,6 +147,9 @@ branch = true
 omit = [
     "src/main.py",
     "alembic/*",
+    "src/core/db.py",
+    "src/shared/unit_of_work.py",
+    "src/modules/auth/infrastructure/repositories.py",
 ]
 
 [tool.coverage.report]

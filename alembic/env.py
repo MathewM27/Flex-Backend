@@ -28,11 +28,9 @@ config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 # Collect metadata from every module that has an ORM mapping.
 # Imports are deferred so adding a module is a one-line change.
-from sqlalchemy import MetaData
+from src.modules.auth.infrastructure.orm import Base as auth_base
 
-target_metadata = MetaData()
-# Module ORM imports go here, e.g.:
-# from src.modules.auth.infrastructure import orm as auth_orm
+target_metadata = auth_base.metadata
 
 
 def _run_migrations(connection):  # type: ignore[no-untyped-def]
